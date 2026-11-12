@@ -15,13 +15,28 @@ BASE = "https://api.elections.kalshi.com/trade-api/v2"
 SERIES = "KXEPLGAME"
 
 
+def _to_prob(v) -> float | None:
+    """Kalshi prices arrive as cent ints (43), dollar strings ("0.4300") or cent strings ("43").
+
+    Normalize all of them to a probability in [0, 1]. Zero / missing -> None.
+    """
+    if v in (None, ""):
+        return None
+    if isinstance(v, str):
+        try:
+            x = float(v)
+        except ValueError:
+            return None
+        x = x if "." in v else x / 100
+    else:
+        x = float(v) / 100 if float(v) > 1 else float(v)
+    return x if 0 < x <= 1 else None
+
+
 def _price(m: dict, field: str) -> float | None:
-    """Return price in [0, 1]. Handles both cent ints and *_dollars strings."""
-    d = m.get(f"{field}_dollars")
-    if d not in (None, ""):
-        return float(d)
-    v = m.get(field)
-    return v / 100 if v not in (None, 0) else None
+    """Return price in [0, 1] from a market dict (prefers the *_dollars field when present)."""
+    d = _to_prob(m.get(f"{field}_dollars"))
+    return d if d is not None else _to_prob(m.get(field))
 
 
 def _mid(m: dict) -> float | None:
@@ -178,10 +193,8 @@ def _candles(ticker: str, start: datetime, end: datetime) -> list[dict]:
 def _candle_mid(c: dict) -> float | None:
     def close(k):
         v = c.get(k) or {}
-        d = v.get("close_dollars")
-        if d not in (None, ""):
-            return float(d)
-        return v["close"] / 100 if v.get("close") not in (None, 0) else None
+        d = _to_prob(v.get("close_dollars"))
+        return d if d is not None else _to_prob(v.get("close"))
     bid, ask = close("yes_bid"), close("yes_ask")
     if bid and ask:
         return (bid + ask) / 2

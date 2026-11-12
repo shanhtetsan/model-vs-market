@@ -45,3 +45,12 @@ def test_model_learns_strong_team():
     p = m.predict("Arsenal", "Everton")
     assert p["H"] > 0.55 and abs(sum(p.values()) - 1) < 1e-9
     assert m.ratings().index[0] == "Arsenal"
+
+
+def test_kalshi_price_formats():
+    from mvm.kalshi import _to_prob
+    assert _to_prob(43) == 0.43
+    assert _to_prob("0.4300") == 0.43
+    assert _to_prob("43") == 0.43
+    assert _to_prob("1.0000") == 1.0
+    assert _to_prob(0) is None and _to_prob("") is None and _to_prob(None) is None
