@@ -98,10 +98,14 @@ def cmd_results(a):
 
 
 def _remaining_fixtures(played: pd.DataFrame) -> pd.DataFrame:
-    from .data import load_openfootball
-    fx = load_openfootball(CURRENT, include_fixtures=True)[["home", "away"]]
+    """Double round-robin: every team hosts every other team once. Remaining = all pairs minus played.
+
+    Needs no fixture file, so it works with either data source.
+    """
+    teams = sorted(set(played.home) | set(played.away))
     done = set(zip(played.home, played.away))
-    return fx[[(h, a) not in done for h, a in zip(fx.home, fx.away)]].reset_index(drop=True)
+    rows = [(h, a) for h in teams for a in teams if h != a and (h, a) not in done]
+    return pd.DataFrame(rows, columns=["home", "away"])
 
 
 def _demo_markets(prior: DixonColes, played: pd.DataFrame, upcoming: pd.DataFrame) -> pd.DataFrame:
