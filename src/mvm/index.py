@@ -119,8 +119,13 @@ class MarketImplied:
 
 
 def simulate_season(model, played: pd.DataFrame, fixtures: pd.DataFrame,
-                    n_sims: int = 20000, seed: int = 0) -> pd.DataFrame:
+                    n_sims: int = 20000, seed: int = 0, strength_sd: float = 0.15) -> pd.DataFrame:
     """Monte Carlo the rest of the season.
+
+    Team strength is NOT fixed: each simulated season draws a shock per team
+    (sd = strength_sd on the log-goal scale, applied to attack and defence) to represent
+    injuries, form and transfers over the remaining months. Without it the simulation is
+    overconfident: favourites too high, outsiders near zero.
 
     played:   home, away, hg, ag  (results so far this season)
     fixtures: home, away          (remaining matches)
@@ -141,12 +146,14 @@ def simulate_season(model, played: pd.DataFrame, fixtures: pd.DataFrame,
         else: pts0[i] += 1; pts0[j] += 1
 
     pts = np.tile(pts0, (n_sims, 1)); gd = np.tile(gd0, (n_sims, 1)); gf = np.tile(gf0, (n_sims, 1))
+    shock = rng.normal(0, strength_sd, (n_sims, nt))   # + better attack, - fewer conceded
     for r in fixtures.itertuples():
         i, j = idx[r.home], idx[r.away]
         a_h, d_h = model._params(r.home) if hasattr(model, "_params") else (model.attack_[r.home], model.defence_[r.home])
         a_a, d_a = model._params(r.away) if hasattr(model, "_params") else (model.attack_[r.away], model.defence_[r.away])
-        hg = rng.poisson(np.exp(a_h + d_a + model.home_adv_), n_sims)
-        ag = rng.poisson(np.exp(a_a + d_h), n_sims)
+        sh, sa = shock[:, i], shock[:, j]
+        hg = rng.poisson(np.exp(a_h + sh + d_a - sa + model.home_adv_))
+        ag = rng.poisson(np.exp(a_a + sa + d_h - sh))
         pts[:, i] += np.where(hg > ag, 3, np.where(hg == ag, 1, 0))
         pts[:, j] += np.where(ag > hg, 3, np.where(hg == ag, 1, 0))
         gd[:, i] += hg - ag; gd[:, j] += ag - hg
