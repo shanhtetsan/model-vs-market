@@ -80,6 +80,10 @@ def load_footballdata(season: str) -> pd.DataFrame:
         "ag": df["FTAG"].astype(int),
         "season": season,
     })
+    if "Time" in df:  # UK local kickoff time -> UTC timestamp, used to read Kalshi's pre-kickoff price
+        local = pd.to_datetime(df["Date"] + " " + df["Time"].fillna("15:00"), dayfirst=True, errors="coerce")
+        out["kickoff_utc"] = (local.dt.tz_localize("Europe/London", ambiguous="NaT", nonexistent="NaT")
+                              .dt.tz_convert("UTC").dt.tz_localize(None)).values
     # Pinnacle closing odds = best free proxy for a sharp market price.
     for col, src in [("psh", "PSCH"), ("psd", "PSCD"), ("psa", "PSCA")]:
         if src in df:

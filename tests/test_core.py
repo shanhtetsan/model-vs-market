@@ -49,7 +49,7 @@ def test_model_learns_strong_team():
 
 def test_kalshi_price_formats():
     from mvm.kalshi import _to_prob
-    assert _to_prob(43) == 0.43
+    assert _to_prob(43) == 0.43 and _to_prob(1) == 0.01 and _to_prob(0.43) == 0.43
     assert _to_prob("0.4300") == 0.43
     assert _to_prob("43") == 0.43
     assert _to_prob("1.0000") == 1.0

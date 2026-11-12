@@ -28,8 +28,10 @@ def _to_prob(v) -> float | None:
         except ValueError:
             return None
         x = x if "." in v else x / 100
-    else:
-        x = float(v) / 100 if float(v) > 1 else float(v)
+    elif isinstance(v, int):          # ints are always cents (1 -> 0.01)
+        x = v / 100
+    else:                             # floats: dollars if <= 1, else cents
+        x = float(v) if float(v) <= 1 else float(v) / 100
     return x if 0 < x <= 1 else None
 
 
@@ -195,6 +197,7 @@ def _kickoff(m: dict) -> datetime | None:
 
 
 def _candles(ticker: str, start: datetime, end: datetime) -> list[dict]:
+    # cache key includes the window, so a corrected kickoff never reuses a wrong window
     q = {"start_ts": int(start.timestamp()), "end_ts": int(end.timestamp()), "period_interval": 60}
     def live():
         return _get(f"/series/{SERIES}/markets/{ticker}/candlesticks", **q)
@@ -208,7 +211,7 @@ def _candles(ticker: str, start: datetime, end: datetime) -> list[dict]:
         except requests.HTTPError:
             pass
         return hist()
-    return _cached(f"candles_{ticker}", fetch).get("candlesticks", [])
+    return _cached(f"candles_{ticker}_{q['start_ts']}_{q['end_ts']}", fetch).get("candlesticks", [])
 
 
 def _candle_mid(c: dict) -> float | None:
@@ -222,7 +225,8 @@ def _candle_mid(c: dict) -> float | None:
     return close("price")
 
 
-def prekickoff_prices(events: list[dict], hours_before: int = 1) -> pd.DataFrame:
+def prekickoff_prices(events: list[dict], hours_before: int = 1,
+                      kickoffs: dict | None = None) -> pd.DataFrame:
     """One row per match: Kalshi H/D/A probabilities ~1h before kickoff, normalized."""
     rows, skipped = [], 0
     print(f"Pulling pre-kickoff Kalshi prices for {len(events)} matches (cached after the first run)...")
@@ -230,7 +234,7 @@ def prekickoff_prices(events: list[dict], hours_before: int = 1) -> pd.DataFrame
         if n % 25 == 0:
             print(f"  {n}/{len(events)}")
         try:
-            row = _prekickoff_row(ev, hours_before)
+            row = _prekickoff_row(ev, hours_before, kickoffs or {})
         except Exception as e:  # one bad market should never kill the whole run
             skipped += 1
             print(f"  skipped {ev.get('event_ticker')}: {type(e).__name__}")
@@ -241,18 +245,27 @@ def prekickoff_prices(events: list[dict], hours_before: int = 1) -> pd.DataFrame
     return pd.DataFrame(rows).sort_values("date").reset_index(drop=True) if rows else pd.DataFrame()
 
 
-def _prekickoff_row(ev: dict, hours_before: int) -> dict | None:
+def _prekickoff_row(ev: dict, hours_before: int, kickoffs: dict) -> dict | None:
     teams = parse_teams(ev)
     if not teams:
         return None
     parsed = {"home": teams[0], "away": teams[1]}
-    probs, ko = {}, None
+    # Kickoff: real UK kickoff time from the results data when we have it. Otherwise 10:00 UTC on the
+    # match date in the ticker, which is before every Premier League kickoff. Never the market's
+    # close/expiry time: that is after full time, when the price has already settled.
+    day = ticker_date(ev.get("event_ticker"))
+    ko = kickoffs.get((parsed["home"], parsed["away"]))
+    if ko is not None and pd.notna(ko):
+        ko = pd.Timestamp(ko).tz_localize("UTC").to_pydatetime()
+    elif day:
+        ko = day.replace(hour=10)
+    else:
+        return None
+    cutoff = (ko - timedelta(hours=hours_before)).timestamp()
+    probs = {}
     for m in _event_markets(ev):
-        ko = ko or _kickoff(m)
-        if not ko:
-            continue
-        cs = [c for c in _candles(m["ticker"], ko - timedelta(days=3), ko)
-              if c.get("end_period_ts", 0) <= (ko - timedelta(hours=hours_before)).timestamp()]
+        cs = [c for c in _candles(m["ticker"], ko - timedelta(days=2), ko + timedelta(hours=1))
+              if c.get("end_period_ts", 0) <= cutoff]
         if not cs:
             continue
         mid = _candle_mid(cs[-1])
@@ -264,6 +277,9 @@ def _prekickoff_row(ev: dict, hours_before: int) -> dict | None:
     if set(probs) != {"H", "D", "A"}:
         return None
     tot = sum(probs.values())
+    # Sanity check: a pre-match football price is never ~certain. If it is, we caught it after kickoff.
+    if max(probs.values()) / tot > 0.93 or probs["D"] / tot < 0.08:
+        raise ValueError("price looks in-play/settled, not pre-match")
     return {"date": ko.astimezone(timezone.utc).replace(tzinfo=None), "home": parsed["home"],
             "away": parsed["away"], "ticker": ev["event_ticker"],
             **{f"m{k}": v / tot for k, v in probs.items()}}

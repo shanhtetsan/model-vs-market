@@ -54,7 +54,7 @@ def test_prekickoff_prices_with_mocked_api(monkeypatch, tmp_path):
         {"ticker": "KXEPLGAME-26NOV21ARSLEE-ARS", "yes_sub_title": "Arsenal", "occurrence_datetime": ko},
         {"ticker": "KXEPLGAME-26NOV21ARSLEE-TIE", "yes_sub_title": "Tie", "occurrence_datetime": ko},
         {"ticker": "KXEPLGAME-26NOV21ARSLEE-LEE", "yes_sub_title": "Leeds", "occurrence_datetime": ko}]}
-    ts = int(pd.Timestamp("2026-11-21T13:00:00Z").timestamp())
+    ts = int(pd.Timestamp("2026-11-21T08:00:00Z").timestamp())  # before the 10:00 UTC fallback kickoff
     price = {"ARS": (68, 70), "TIE": (19, 21), "LEE": (11, 13)}
 
     def fake_get(path, **q):
@@ -64,3 +64,27 @@ def test_prekickoff_prices_with_mocked_api(monkeypatch, tmp_path):
     df = kalshi.prekickoff_prices([ev])
     assert len(df) == 1 and df.loc[0, "home"] == "Arsenal"
     assert abs(df.loc[0, ["mH", "mD", "mA"]].sum() - 1) < 1e-9 and df.loc[0, "mH"] > .6
+
+
+def test_prekickoff_rejects_settled_prices(monkeypatch, tmp_path):
+    monkeypatch.setattr(kalshi, "CACHE", tmp_path)
+    ev = {"event_ticker": "KXEPLGAME-26NOV21ARSLEE", "title": "Arsenal vs Leeds", "markets": [
+        {"ticker": "KXEPLGAME-26NOV21ARSLEE-ARS", "yes_sub_title": "Arsenal"},
+        {"ticker": "KXEPLGAME-26NOV21ARSLEE-TIE", "yes_sub_title": "Tie"},
+        {"ticker": "KXEPLGAME-26NOV21ARSLEE-LEE", "yes_sub_title": "Leeds"}]}
+    ts = int(pd.Timestamp("2026-11-21T08:00:00Z").timestamp())
+    price = {"ARS": (98, 99), "TIE": (1, 2), "LEE": (1, 2)}   # looks settled
+    monkeypatch.setattr(kalshi, "_get", lambda path, **q: {"candlesticks": [
+        {"end_period_ts": ts, "yes_bid": {"close": price[path.split("/")[-2].rsplit("-", 1)[-1]][0]},
+         "yes_ask": {"close": price[path.split("/")[-2].rsplit("-", 1)[-1]][1]}}]})
+    assert kalshi.prekickoff_prices([ev]).empty
+
+
+def test_footballdata_kickoff_utc(tmp_path, monkeypatch):
+    from mvm import data
+    monkeypatch.setattr(data, "RAW", tmp_path)
+    (tmp_path / "E0_2026-27.csv").write_text(
+        "Date,Time,HomeTeam,AwayTeam,FTHG,FTAG\n21/11/2026,15:00,Arsenal,Leeds,2,0\n12/08/2026,12:30,Chelsea,Hull,1,1\n")
+    df = data.load_footballdata("2026-27")
+    assert str(df.kickoff_utc[0]) == "2026-11-21 15:00:00"   # GMT in winter
+    assert str(df.kickoff_utc[1]) == "2026-08-12 11:30:00"   # BST in summer

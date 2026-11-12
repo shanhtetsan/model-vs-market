@@ -137,7 +137,10 @@ def cmd_index(a):
         mk = _demo_markets(prior, played, remaining)
     else:
         season_start = pd.Timestamp(played["date"].min()).tz_localize("UTC").to_pydatetime()
-        mk = kalshi.prekickoff_prices(kalshi.fetch_settled_events(min_close=season_start))
+        ko = {}
+        if "kickoff_utc" in played:
+            ko = {(h, a_): k for h, a_, k in zip(played.home, played.away, played.kickoff_utc)}
+        mk = kalshi.prekickoff_prices(kalshi.fetch_settled_events(min_close=season_start), kickoffs=ko)
         live = pd.DataFrame(kalshi.epl_prices())
         if not live.empty:
             live = live.rename(columns={"H": "mH", "D": "mD", "A": "mA"})
@@ -167,6 +170,8 @@ def cmd_index(a):
     path = report.index_chart(t, title, sub, OUT / ("index_demo.png" if a.demo else "index.png"))
     print(t[["team", "index", "delta", "exp_points", "p_title", "p_top4", "p_relegation"]].round(3).to_string())
     print(f"\nFit error vs Kalshi (mean abs, prob points): {now.fit_error_:.3f} over {len(mk)} matches")
+    if now.fit_error_ > 0.06:
+        print("WARNING: fit error is high. Kalshi prices may not be pre-match. Don't post this chart.")
     print(f"Chart: {path}")
 
 
