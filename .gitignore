@@ -1,0 +1,14 @@
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+output/demo_*
+output/*.txt
+output/preview.png
+data/raw/
+data/kalshi_cache/
+data/predictions_log.csv
+output/index.csv
+output/index.png
+output/scored_predictions.csv
+*.egg-info/
