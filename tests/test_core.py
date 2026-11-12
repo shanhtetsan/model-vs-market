@@ -54,3 +54,10 @@ def test_kalshi_price_formats():
     assert _to_prob("43") == 0.43
     assert _to_prob("1.0000") == 1.0
     assert _to_prob(0) is None and _to_prob("") is None and _to_prob(None) is None
+
+
+def test_ticker_date():
+    from mvm.kalshi import ticker_date
+    d = ticker_date("KXEPLGAME-26APR10WHUWOL")
+    assert (d.year, d.month, d.day) == (2026, 4, 10)
+    assert ticker_date("garbage") is None
