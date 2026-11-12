@@ -296,3 +296,52 @@ def index_chart(table: pd.DataFrame, title: str, subtitle: str, path: Path) -> P
     fig.savefig(path, facecolor=WHITE)
     plt.close(fig)
     return path
+
+
+def title_gap_chart(rows: pd.DataFrame, path: Path, title: str, subtitle: str, note: str | None = None) -> Path:
+    """Kalshi title market vs title odds implied by Kalshi match prices.
+
+    rows: team, market (Kalshi title price), implied (index simulation), both in [0, 1].
+    """
+    d = rows.assign(gap=rows.implied - rows.market).reset_index(drop=True)
+    d = d.iloc[::-1].reset_index(drop=True)          # biggest favourite on top
+    top = d.gap.abs().idxmax()
+    fig = plt.figure(figsize=(8, 10), dpi=200, facecolor=WHITE)
+    _frame(fig, "Premier League title  ·  Two Kalshi prices", title, subtitle)
+    _key(fig, .775, [("Title market", "dot", GREEN), ("Implied by match prices", "ring", MINE)])
+    y0, h = 0.25, 0.47
+    ax = fig.add_axes([0.25, y0, 0.40, h], facecolor="none")
+    cols = {"MARKET": .72, "MATCHES": .82, "GAP": .925}
+    row = h / (len(d) - .2 + .6)   # matches ylim span below
+    yc = y0 + (top + .6) * row
+    fig.patches.append(plt.Rectangle((.07, yc - row * .42), .86, row * .84, transform=fig.transFigure,
+                                     facecolor=LIGHT, edgecolor="none", zorder=-1))
+    for i, r in d.iterrows():
+        hi = i == top
+        ax.plot([r.market, r.implied], [i, i], color=ACCENT if hi else SOFT, lw=6 if hi else 4,
+                solid_capstyle="butt", zorder=2)
+        ax.scatter(r.market, i, s=170 if hi else 110, color=GREEN, edgecolor=WHITE, lw=1.5, zorder=3)
+        ax.scatter(r.implied, i, s=170 if hi else 110, facecolor=WHITE, edgecolor=MINE, lw=2.6, zorder=4)
+        ax.text(-.03, i, r.team, va="center", ha="right", fontproperties=COND_B if hi else COND,
+                fontsize=16 if hi else 15, color=BLACK if hi else MUTED, transform=ax.transData)
+        yf = y0 + (i + .6) * row
+        _t(fig, cols["MARKET"], yf, f"{r.market:.0%}", COND_B, 15, DARK_GREEN, ha="center", va="center")
+        _t(fig, cols["MATCHES"], yf, f"{r.implied:.0%}", COND_B, 15, BLACK, ha="center", va="center")
+        _t(fig, cols["GAP"], yf, _signed(-r.gap), COND_B, 17 if hi else 15, ACCENT if hi else MUTED,
+           ha="right", va="center")
+    hy = y0 + (len(d) - .2 + .6) * row - row * .35
+    for k, x in cols.items():
+        _t(fig, x, hy, k, COND_B, 10, MUTED, ha="right" if k == "GAP" else "center", va="center")
+    ax.set_xlim(0, .8); ax.set_ylim(-.6, len(d) - .2); ax.set_yticks([])
+    ax.set_xticks([0, .25, .5, .75]); ax.set_xticklabels(["0%", "25%", "50%", "75%"])
+    ax.grid(axis="x", color=RULE, lw=1); ax.set_axisbelow(True)
+    _axis_style(ax)
+    if note:
+        _t(fig, .07, .135, note, REG, 11, MUTED, wrap=True)
+    _t(fig, .07, .095, "Implied = 20,000 simulated seasons using team ratings fitted to Kalshi pre-match prices.",
+       REG, 9.5, MUTED)
+    _footer(fig)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, facecolor=WHITE)
+    plt.close(fig)
+    return path

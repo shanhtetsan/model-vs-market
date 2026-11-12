@@ -175,6 +175,26 @@ def cmd_index(a):
     print(f"Chart: {path}")
 
 
+def cmd_titlegap(a):
+    """Compare Kalshi's title market with the index's match-implied title odds.
+
+    --market "Arsenal=71,Man City=12,Brighton=8,Liverpool=5,Chelsea=4"  (percent, from Kalshi)
+    """
+    from .teams import normalize
+    idx = pd.read_csv(OUT / "index.csv").set_index("team")
+    rows = []
+    for part in a.market.split(","):
+        name, pct = part.rsplit("=", 1)
+        t = normalize(name.strip())
+        rows.append({"team": t, "market": float(pct) / 100, "implied": float(idx.loc[t, "p_title"])})
+    df = pd.DataFrame(rows)
+    big = df.assign(g=(df.implied - df.market).abs()).sort_values("g").iloc[-1]
+    title = a.title or f"{big.team}: the gap between two Kalshi prices"
+    sub = a.subtitle or (f"Match prices say {big.implied:.0%}. The title market says {big.market:.0%}.")
+    path = report.title_gap_chart(df, OUT / "title_gap.png", title, sub, a.note)
+    print(df.round(3).to_string(index=False), f"\nChart: {path}")
+
+
 def main():
     p = argparse.ArgumentParser(prog="mvm")
     sub = p.add_subparsers(required=True)
@@ -194,6 +214,10 @@ def main():
     ix.add_argument("--sims", type=int, default=20000)
     ix.add_argument("--title", help="override chart headline")
     ix.set_defaults(f=cmd_index)
+    tg = sub.add_parser("titlegap")
+    tg.add_argument("--market", required=True, help='Kalshi title prices, e.g. "Arsenal=71,Man City=12"')
+    tg.add_argument("--title"); tg.add_argument("--subtitle"); tg.add_argument("--note")
+    tg.set_defaults(f=cmd_titlegap)
     a = p.parse_args()
     a.f(a)
 

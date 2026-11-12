@@ -20,6 +20,8 @@ What does the market think every team is worth right now? Each Kalshi match pric
 ```bash
 python -m mvm index          # live: settled + open KXEPLGAME prices
 python -m mvm index --demo   # offline: synthetic prices, for testing
+python -m mvm titlegap --market "Arsenal=71,Man City=12,Brighton=8,Liverpool=5,Chelsea=4"
+                             # Kalshi title market vs title odds implied by Kalshi match prices
 ```
 
 ## Backtest (walk-forward, no look-ahead)
