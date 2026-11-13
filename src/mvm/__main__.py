@@ -195,6 +195,25 @@ def cmd_titlegap(a):
     print(df.round(3).to_string(index=False), f"\nChart: {path}")
 
 
+def cmd_ladder(a):
+    """Any Kalshi ladder -> full forecast chart.
+
+    python -m mvm ladder --above "80=97,85=90,90=72,95=40" --title "GTA 6 Metacritic" --unit "score" --ceil 100
+    """
+    from .ladder import buckets, expected, parse_ladder
+    b, issues = buckets(parse_ladder(a.above), a.floor, a.ceil)
+    ev = expected(b)
+    top = b.loc[b.p.idxmax()]
+    sub = a.subtitle or f"Most likely: {top.label} ({top.p:.0%}). Market-implied average: {ev:.1f}."
+    path = report.ladder_chart(b, OUT / "ladder.png", a.kicker, a.title, sub,
+                               hero=f"{ev:.1f}", hero_label=f"Market-implied expected {a.unit}",
+                               issues=issues, note=a.note)
+    print(b.assign(p=b.p.round(3)).to_string(index=False))
+    print(f"\nExpected {a.unit}: {ev:.2f}")
+    print("Consistency: " + ("; ".join(issues) if issues else "passed"))
+    print(f"Chart: {path}")
+
+
 def main():
     p = argparse.ArgumentParser(prog="mvm")
     sub = p.add_subparsers(required=True)
@@ -218,6 +237,12 @@ def main():
     tg.add_argument("--market", required=True, help='Kalshi title prices, e.g. "Arsenal=71,Man City=12"')
     tg.add_argument("--title"); tg.add_argument("--subtitle"); tg.add_argument("--note")
     tg.set_defaults(f=cmd_titlegap)
+    ld = sub.add_parser("ladder")
+    ld.add_argument("--above", required=True, help='"threshold=percent,...", e.g. "85=90,90=72,95=40"')
+    ld.add_argument("--title", required=True); ld.add_argument("--subtitle")
+    ld.add_argument("--kicker", default="Kalshi forecast"); ld.add_argument("--unit", default="value")
+    ld.add_argument("--floor", type=float); ld.add_argument("--ceil", type=float); ld.add_argument("--note")
+    ld.set_defaults(f=cmd_ladder)
     a = p.parse_args()
     a.f(a)
 

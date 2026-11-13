@@ -24,6 +24,17 @@ python -m mvm titlegap --market "Arsenal=71,Man City=12,Brighton=8,Liverpool=5,C
                              # Kalshi title market vs title odds implied by Kalshi match prices
 ```
 
+## Ladders: any "above X" market -> full forecast
+
+Many Kalshi markets are ladders (score >= 85 / >= 90 / >= 95; event before Dec / Jan / Mar).
+`mvm ladder` turns one into bucket probabilities, a market-implied expected value, and a consistency
+check (a higher threshold can never be more likely than a lower one).
+
+```bash
+python -m mvm ladder --above "80=97,85=91,90=74,95=41,97=12" --title "GTA 6: what Kalshi expects from critics" \
+  --unit "Metacritic score" --floor 70 --ceil 100
+```
+
 ## Backtest (walk-forward, no look-ahead)
 
 The model is refit before every matchday using only earlier matches.

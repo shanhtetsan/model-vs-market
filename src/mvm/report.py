@@ -345,3 +345,43 @@ def title_gap_chart(rows: pd.DataFrame, path: Path, title: str, subtitle: str, n
     fig.savefig(path, facecolor=WHITE)
     plt.close(fig)
     return path
+
+
+def ladder_chart(b: pd.DataFrame, path: Path, kicker: str, title: str, subtitle: str,
+                 hero: str, hero_label: str, issues: list[str] | None = None, note: str | None = None) -> Path:
+    """Market's full forecast from a ladder of 'above X' contracts. b: label, p (bucket probability)."""
+    fig = plt.figure(figsize=(8, 10), dpi=200, facecolor=WHITE)
+    _frame(fig, kicker, title, subtitle)
+    _t(fig, .07, .735, hero, BOLD, 64, ACCENT)
+    _t(fig, .07, .71, hero_label.upper(), COND_B, 11, MUTED)
+    n = len(b)
+    top, bottom = .66, .2
+    rh = (top - bottom) / n
+    best = int(b.p.idxmax())
+    pmax = b.p.max()
+    _t(fig, .07, top + .012, "OUTCOME", COND_B, 10, MUTED)
+    _t(fig, .93, top + .012, "MARKET PROBABILITY", COND_B, 10, MUTED, ha="right")
+    for i, r in b.iloc[::-1].reset_index().iterrows():
+        y = top - (i + .5) * rh
+        hi = r["index"] == best
+        _t(fig, .07, y, r.label, COND_B if hi else COND, 15 if hi else 14, BLACK if hi else MUTED, va="center")
+        w = .52 * (r.p / pmax if pmax else 0)
+        fig.patches.append(plt.Rectangle((.28, y - rh * .3), max(w, .002), rh * .6, transform=fig.transFigure,
+                                         facecolor=DARK_GREEN if hi else GREEN, edgecolor="none"))
+        _t(fig, .28 + w + .012, y, f"{r.p:.0%}", COND_B, 14 if hi else 13, BLACK, va="center")
+    y = .155
+    if issues:
+        _t(fig, .07, y, "CONSISTENCY CHECK: " + str(len(issues)) + " ISSUE" + ("S" if len(issues) > 1 else ""),
+           COND_B, 10.5, BLACK); y -= .022
+        for s in issues[:2]:
+            _t(fig, .07, y, s, REG, 10, MUTED); y -= .02
+    else:
+        _t(fig, .07, y, "CONSISTENCY CHECK: PASSED", COND_B, 10.5, ACCENT); y -= .022
+        if note:
+            _t(fig, .07, y, note, REG, 10, MUTED)
+    _t(fig, .07, .088, "Bucket probabilities = differences between adjacent Kalshi 'above' contracts.", REG, 9.5, MUTED)
+    _footer(fig)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, facecolor=WHITE)
+    plt.close(fig)
+    return path
