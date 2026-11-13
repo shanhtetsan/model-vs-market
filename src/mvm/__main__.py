@@ -201,7 +201,10 @@ def cmd_ladder(a):
     python -m mvm ladder --above "80=97,85=90,90=72,95=40" --title "GTA 6 Metacritic" --unit "score" --ceil 100
     """
     from .ladder import buckets, expected, parse_ladder
-    b, issues = buckets(parse_ladder(a.above), a.floor, a.ceil)
+    spec = a.above
+    if a.strictly_above:  # Kalshi "Above 95" on whole-number scores means 96 or higher
+        spec = ",".join(f"{float(k) + 1:g}={v}" for k, v in (x.split("=") for x in spec.split(",")))
+    b, issues = buckets(parse_ladder(spec), a.floor, a.ceil, integer=a.integer or a.strictly_above)
     ev = expected(b)
     top = b.loc[b.p.idxmax()]
     sub = a.subtitle or f"Most likely: {top.label} ({top.p:.0%}). Market-implied average: {ev:.1f}."
@@ -242,6 +245,9 @@ def main():
     ld.add_argument("--title", required=True); ld.add_argument("--subtitle")
     ld.add_argument("--kicker", default="Kalshi forecast"); ld.add_argument("--unit", default="value")
     ld.add_argument("--floor", type=float); ld.add_argument("--ceil", type=float); ld.add_argument("--note")
+    ld.add_argument("--integer", action="store_true", help="whole-number outcomes: label exact values")
+    ld.add_argument("--strictly-above", action="store_true",
+                    help='thresholds are Kalshi "Above X" on whole numbers (X+1 or higher); implies --integer')
     ld.set_defaults(f=cmd_ladder)
     a = p.parse_args()
     a.f(a)

@@ -19,7 +19,8 @@ def parse_ladder(spec: str) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("threshold").reset_index(drop=True)
 
 
-def buckets(ladder: pd.DataFrame, floor: float | None = None, ceil: float | None = None) -> tuple[pd.DataFrame, list[str]]:
+def buckets(ladder: pd.DataFrame, floor: float | None = None, ceil: float | None = None,
+            integer: bool = False) -> tuple[pd.DataFrame, list[str]]:
     """Bucket probabilities + consistency issues.
 
     floor / ceil: plausible min / max of the quantity (used for the tail buckets' midpoints).
@@ -34,10 +35,18 @@ def buckets(ladder: pd.DataFrame, floor: float | None = None, ceil: float | None
     step = (t[-1] - t[0]) / max(len(t) - 1, 1) if len(t) > 1 else 5
     lo = floor if floor is not None else t[0] - step
     hi = ceil if ceil is not None else t[-1] + step
-    rows = [{"label": f"Below {t[0]:g}", "p": 1 - fixed[0], "mid": (lo + t[0]) / 2}]
-    for i in range(len(t) - 1):
-        rows.append({"label": f"{t[i]:g}–{t[i+1]:g}", "p": fixed[i] - fixed[i + 1], "mid": (t[i] + t[i + 1]) / 2})
-    rows.append({"label": f"{t[-1]:g}+", "p": fixed[-1], "mid": (t[-1] + hi) / 2})
+    if integer:  # whole-number outcomes (review scores): label exact values, e.g. "96", "95 or lower"
+        rows = [{"label": f"{t[0] - 1:g} or lower", "p": 1 - fixed[0], "mid": (lo + t[0] - 1) / 2}]
+        for i in range(len(t) - 1):
+            lab = f"{t[i]:g}" if t[i + 1] - t[i] == 1 else f"{t[i]:g}–{t[i+1] - 1:g}"
+            rows.append({"label": lab, "p": fixed[i] - fixed[i + 1], "mid": (t[i] + t[i + 1] - 1) / 2})
+        rows.append({"label": f"{t[-1]:g}+", "p": fixed[-1], "mid": (t[-1] + hi) / 2})
+    else:
+        rows = [{"label": f"Below {t[0]:g}", "p": 1 - fixed[0], "mid": (lo + t[0]) / 2}]
+        for i in range(len(t) - 1):
+            rows.append({"label": f"{t[i]:g}–{t[i+1]:g}", "p": fixed[i] - fixed[i + 1],
+                         "mid": (t[i] + t[i + 1]) / 2})
+        rows.append({"label": f"{t[-1]:g}+", "p": fixed[-1], "mid": (t[-1] + hi) / 2})
     b = pd.DataFrame(rows)
     b["p"] = b["p"].clip(lower=0)
     b["p"] = b["p"] / b["p"].sum()
