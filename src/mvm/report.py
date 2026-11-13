@@ -38,8 +38,48 @@ def _t(fig, x, y, s, fp, size, color=BLACK, **kw):
     return fig.text(x, y, s, fontproperties=fp, fontsize=size, color=color, **kw)
 
 
+CATEGORY = None          # set to "football" / "gaming" / "geopolitics" to add a category tag
+CATEGORY_TINT = True     # each category gets its own muted color on the tag only
+CAT_COLORS = {"football": "#2F6B3F", "gaming": "#5B4A9E", "geopolitics": "#2D5D8A"}
+
+
+def _icon(ax, cat: str, c: str):
+    """Simple generic icons drawn from shapes (no logos). ax: unit square, equal aspect."""
+    from matplotlib.patches import Circle, FancyBboxPatch, RegularPolygon, Ellipse, Rectangle
+    if cat == "football":
+        ax.add_patch(Circle((.5, .5), .45, facecolor="none", edgecolor=c, lw=1.8))
+        ax.add_patch(RegularPolygon((.5, .5), 5, radius=.17, color=c))
+        for k in range(5):
+            import math
+            a = math.pi / 2 + k * 2 * math.pi / 5
+            ax.plot([.5 + .17 * math.cos(a), .5 + .45 * math.cos(a)],
+                    [.5 + .17 * math.sin(a), .5 + .45 * math.sin(a)], color=c, lw=1.4)
+    elif cat == "gaming":
+        ax.add_patch(FancyBboxPatch((.06, .26), .88, .48, boxstyle="round,pad=0,rounding_size=.22", color=c))
+        ax.add_patch(Rectangle((.19, .46), .2, .08, color=WHITE)); ax.add_patch(Rectangle((.25, .40), .08, .2, color=WHITE))
+        ax.add_patch(Circle((.68, .55), .055, color=WHITE)); ax.add_patch(Circle((.78, .45), .055, color=WHITE))
+    elif cat == "geopolitics":
+        ax.add_patch(Circle((.5, .5), .45, facecolor="none", edgecolor=c, lw=1.8))
+        ax.add_patch(Ellipse((.5, .5), .4, .9, facecolor="none", edgecolor=c, lw=1.4))
+        ax.plot([.05, .95], [.5, .5], color=c, lw=1.4)
+        ax.plot([.12, .88], [.73, .73], color=c, lw=1.1); ax.plot([.12, .88], [.27, .27], color=c, lw=1.1)
+
+
 def _frame(fig, kicker: str, title: str, subtitle: str | None = None):
-    _t(fig, .07, .935, kicker.upper(), COND_B, 12, GREEN)
+    x, y = .07, .941   # kicker row centre line
+    if CATEGORY:
+        col = CAT_COLORS[CATEGORY] if CATEGORY_TINT else BLACK
+        W, H = fig.get_size_inches()
+        sz = .26
+        ax = fig.add_axes([x, y - (sz / H) / 2, sz / W, sz / H]); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        ax.set_aspect("equal"); ax.axis("off")
+        _icon(ax, CATEGORY, col)
+        x += sz / W + .01
+        r = fig.canvas.get_renderer()
+        for txt, c, gap in ((CATEGORY.upper(), col, .012), ("\u00b7", MUTED, .012)):
+            t = _t(fig, x, y, txt, COND_B, 12, c, va="center")
+            x += t.get_window_extent(r).width / (W * fig.dpi) + gap
+    _t(fig, x, y, kicker.upper(), COND_B, 12, GREEN, va="center")
     _t(fig, .07, .875, title, BOLD, 26)
     if subtitle:
         _t(fig, .07, .842, subtitle, REG, 12.5, MUTED)

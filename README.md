@@ -52,6 +52,9 @@ The real benchmark is the market. Download football-data.co.uk data (`--source f
 
 Built to sit alongside Kalshi's own materials: their public brand-kit palette (white, light gray, two greens, dark green, black) and Archivo (SIL OFL, bundled in `src/mvm/assets`) in standard and condensed widths, mirroring how Kalshi Sans uses a condensed width for data. Kalshi = green dot, my model = black ring. Not affiliated with Kalshi.
 
+Every chart command takes `--category football|gaming|geopolitics|none` for the tag at the top
+(simple drawn icon + a muted per-category tint; no third-party logos). Default: football, or none for `ladder`.
+
 ## Usage
 
 ```bash

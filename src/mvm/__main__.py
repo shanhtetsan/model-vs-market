@@ -250,7 +250,15 @@ def main():
     ld.add_argument("--strictly-above", action="store_true",
                     help='thresholds are Kalshi "Above X" on whole numbers (X+1 or higher); implies --integer')
     ld.set_defaults(f=cmd_ladder)
+    cats = ["football", "gaming", "geopolitics", "none"]
+    for name, sp in sub.choices.items():
+        if name == "download":
+            continue
+        default = "none" if name == "ladder" else "football"
+        sp.add_argument("--category", choices=cats, default=default,
+                        help=f"tag at the top of the chart (default: {default})")
     a = p.parse_args()
+    report.CATEGORY = None if getattr(a, "category", "none") == "none" else a.category
     a.f(a)
 
 
