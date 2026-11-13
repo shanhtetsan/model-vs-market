@@ -209,7 +209,7 @@ def cmd_ladder(a):
     top = b.loc[b.p.idxmax()]
     sub = a.subtitle or f"Most likely: {top.label} ({top.p:.0%}). Market-implied average: {ev:.1f}."
     path = report.ladder_chart(b, OUT / "ladder.png", a.kicker, a.title, sub,
-                               hero=f"{ev:.1f}", hero_label=f"Market-implied expected {a.unit}",
+                               hero=a.hero or f"{ev:.1f}", hero_label=a.hero_label or f"Market-implied expected {a.unit}",
                                issues=issues, note=a.note)
     print(b.assign(p=b.p.round(3)).to_string(index=False))
     print(f"\nExpected {a.unit}: {ev:.2f}")
@@ -246,6 +246,7 @@ def main():
     ld.add_argument("--kicker", default="Kalshi forecast"); ld.add_argument("--unit", default="value")
     ld.add_argument("--floor", type=float); ld.add_argument("--ceil", type=float); ld.add_argument("--note")
     ld.add_argument("--integer", action="store_true", help="whole-number outcomes: label exact values")
+    ld.add_argument("--hero", help="override the big number"); ld.add_argument("--hero-label")
     ld.add_argument("--strictly-above", action="store_true",
                     help='thresholds are Kalshi "Above X" on whole numbers (X+1 or higher); implies --integer')
     ld.set_defaults(f=cmd_ladder)
